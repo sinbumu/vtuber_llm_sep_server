@@ -1,0 +1,7 @@
+# Minimal dependencies for the LLM-only server
+fastapi
+uvicorn
+pydantic
+loguru
+pyyaml
+chardet
