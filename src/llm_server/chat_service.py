@@ -4,12 +4,13 @@ import asyncio
 from typing import Any, AsyncIterator, Dict, List
 
 from loguru import logger
+import sys
 
 from open_llm_vtuber.agent.stateless_llm_factory import LLMFactory
 from open_llm_vtuber.agent.input_types import BatchInput, TextData, TextSource
 from open_llm_vtuber.agent.agents.basic_memory_agent import BasicMemoryAgent
 from open_llm_vtuber.chat_history_manager import _get_safe_history_path
-from prompts import prompt_loader
+from .utils import get_base_dir
 
 
 DEFAULT_LLM_TIMEOUT_SECONDS = 60
@@ -37,9 +38,22 @@ def _build_system_prompt(
     persona_prompt: str, tool_prompts: Dict[str, str]
 ) -> str:
     """Build system prompt without Live2D dependency."""
+    base_dir = get_base_dir()
+    if str(base_dir) not in sys.path:
+        sys.path.insert(0, str(base_dir))
+    try:
+        from prompts import prompt_loader
+    except Exception as exc:
+        logger.error(f"Failed to import prompts: {exc}")
+        return persona_prompt or ""
+
     system_prompt = persona_prompt or ""
     for prompt_name, prompt_file in (tool_prompts or {}).items():
-        if prompt_name in {"group_conversation_prompt", "proactive_speak_prompt"}:
+        if prompt_name in {
+            "group_conversation_prompt",
+            "proactive_speak_prompt",
+            "mcp_prompt",
+        }:
             continue
         if prompt_name == "live2d_expression_prompt":
             logger.warning("LLM-only server: skipping live2d_expression_prompt")

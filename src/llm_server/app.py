@@ -1,13 +1,26 @@
 from __future__ import annotations
 
+import sys
+
 from fastapi import FastAPI, HTTPException, WebSocket
 from loguru import logger
+
+from .utils import get_base_dir, ensure_base_dir
+
+# Ensure repo root is importable before importing open_llm_vtuber/prompts
+_BASE_DIR = get_base_dir()
+if str(_BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(_BASE_DIR))
 
 from open_llm_vtuber.chat_history_manager import create_new_history, store_message
 
 from .models import ChatRequest, ChatResponse
-from .utils import ensure_base_dir
-from .config import load_config, override_llm_only_config, validate_tool_prompts, get_character_meta
+from .config import (
+    load_config,
+    override_llm_only_config,
+    validate_tool_prompts,
+    get_character_meta,
+)
 from .chat_service import (
     run_chat_once,
     run_chat_stream,

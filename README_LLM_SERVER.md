@@ -4,6 +4,15 @@
 
 ---
 
+## 0) venv 환경에서 할거라면.
+
+```powershell
+python -m venv .venv   
+.venv\Scripts\activate
+```
+
+---
+
 ## 1) 설치
 
 ```powershell
@@ -21,7 +30,14 @@ uv pip install -r requirements-llm-server.txt
 ## 2) 실행
 
 ```powershell
-uv run uvicorn llm_server.app:app --host 127.0.0.1 --port 8000
+uv run uvicorn llm_server.app:app --app-dir src --host 127.0.0.1 --port 8000
+```
+
+만약 `prompts` 모듈 import 오류가 난다면, 아래처럼 `PYTHONPATH`를 추가해 실행하세요:
+
+```powershell
+$env:PYTHONPATH = "$PWD"
+uv run uvicorn llm_server.app:app --app-dir src --host 127.0.0.1 --port 8000
 ```
 
 ---
@@ -52,9 +68,13 @@ curl -X POST http://127.0.0.1:8000/v1/chat ^
 ## 5) Persona 적용 테스트 (Plan3 이후)
 
 ```powershell
-curl -X POST http://127.0.0.1:8000/v1/chat ^
-  -H "Content-Type: application/json" ^
-  -d "{\"conf_uid\":\"mao_pro_001\",\"history_uid\":null,\"text\":\"너 누구야?\"}"
+$body = @{
+  conf_uid    = "mao_pro_001"
+  history_uid = $null
+  text        = "안녕"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/v1/chat" -Method Post -ContentType "application/json" -Body $body
 ```
 
 의도: `conf.yaml`의 `persona_prompt`가 반영된 응답이 나오는지 확인

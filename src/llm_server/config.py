@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Dict
 from loguru import logger
+import sys
 
-from prompts import prompt_loader
+from .utils import get_base_dir
 from open_llm_vtuber.config_manager.utils import read_yaml
 
 
@@ -38,6 +39,15 @@ def override_llm_only_config(config: Dict[str, Any]) -> Dict[str, Any]:
 
 def validate_tool_prompts(config: Dict[str, Any]) -> None:
     """Validate tool prompt files; log errors but never raise."""
+    base_dir = get_base_dir()
+    if str(base_dir) not in sys.path:
+        sys.path.insert(0, str(base_dir))
+    try:
+        from prompts import prompt_loader
+    except Exception as exc:
+        logger.error(f"Failed to import prompts: {exc}")
+        return
+
     system_config = config.get("system_config", {})
     tool_prompts = system_config.get("tool_prompts", {}) if system_config else {}
 
