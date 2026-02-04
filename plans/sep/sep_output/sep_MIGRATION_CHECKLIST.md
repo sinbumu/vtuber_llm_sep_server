@@ -30,6 +30,27 @@
 
 ---
 
+## 1-1) 권장 이관 절차 (컨텍스트 유지 버전)
+
+**전제:** 현재 로컬 프로젝트를 유지하면서 원격만 새 저장소로 전환
+
+1) **현재 작업 브랜치 정리**
+   - 불필요한 실험/미완료 변경 분리 또는 커밋
+2) **새 원격 저장소 생성**
+   - GitHub에서 빈 저장소 생성
+3) **원격 전환**
+   - 기존 원격 제거 → 새 원격 등록
+4) **푸시**
+   - 새 원격에 전체 커밋 푸시
+5) **새 경로로 클린 클론**
+   - QA 후, 새로운 로컬 경로로 클론
+6) **Cursor 새 세션**
+   - 클린 클론 경로에서 새 채팅 시작
+
+> 이 방식은 기존 컨텍스트를 보존하면서도 “새 레포”로 안전하게 이동합니다.
+
+---
+
 ## 2) 정리/삭제 대상 리스트 (LLM-only 기준)
 
 아래는 LLM-only 서버 분리 시 **새 레포에는 필요 없는** 요소들입니다.
@@ -81,6 +102,65 @@
 - `requirements-llm-server.txt`
 - `README_LLM_SERVER.md`
 - `LICENSE`
+
+---
+
+## 4) QA 스크립트 (PowerShell)
+
+### 4-1) 서버 실행
+```powershell
+uv run uvicorn llm_server.app:app --app-dir src --host 127.0.0.1 --port 8000
+```
+
+### 4-2) /health
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -Method Get
+```
+
+### 4-3) /v1/chat (REST)
+```powershell
+$body = @{
+  conf_uid    = "mao_pro_001"
+  history_uid = $null
+  text        = "안녕"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/v1/chat" -Method Post -ContentType "application/json" -Body $body
+```
+
+### 4-4) /v1/chat (history 이어서)
+```powershell
+$body = @{
+  conf_uid    = "mao_pro_001"
+  history_uid = "PUT_HISTORY_UID_HERE"
+  text        = "이전 대화 이어서"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/v1/chat" -Method Post -ContentType "application/json" -Body $body
+```
+
+### 4-5) /v1/ws/chat (WebSocket)
+> PowerShell 기본 내장만으로는 WS 테스트가 번거로우니,
+> 간단히 `wscat` 또는 간단 스크립트를 사용합니다.
+
+```powershell
+uvx wscat -c ws://127.0.0.1:8000/v1/ws/chat
+```
+이후 입력:
+```json
+{"conf_uid":"mao_pro_001","history_uid":null,"text":"안녕"}
+```
+
+### 4-6) 오류 케이스 (history_not_found)
+```powershell
+$body = @{
+  conf_uid    = "mao_pro_001"
+  history_uid = "no_such_history"
+  text        = "테스트"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/v1/chat" -Method Post -ContentType "application/json" -Body $body
+```
 
 ---
 
