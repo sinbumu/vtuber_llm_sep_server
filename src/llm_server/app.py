@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket
 from loguru import logger
 
 from open_llm_vtuber.chat_history_manager import create_new_history, store_message
@@ -8,7 +8,13 @@ from open_llm_vtuber.chat_history_manager import create_new_history, store_messa
 from .models import ChatRequest, ChatResponse
 from .utils import ensure_base_dir
 from .config import load_config, override_llm_only_config, validate_tool_prompts, get_character_meta
-from .chat_service import run_chat_once, history_exists, LLMError, LLMTimeoutError
+from .chat_service import (
+    run_chat_once,
+    run_chat_stream,
+    history_exists,
+    LLMError,
+    LLMTimeoutError,
+)
 
 app = FastAPI(title="Open-LLM-VTuber LLM-only Server")
 
@@ -83,3 +89,84 @@ async def chat(request: ChatRequest) -> ChatResponse:
     )
 
     return ChatResponse(history_uid=history_uid, text=assistant_text)
+
+
+@app.websocket("/v1/ws/chat")
+async def chat_ws(websocket: WebSocket) -> None:
+    await websocket.accept()
+
+    try:
+        payload = await websocket.receive_json()
+        conf_uid = (payload.get("conf_uid") or "").strip()
+        history_uid = payload.get("history_uid")
+        text = payload.get("text") or ""
+
+        if history_uid:
+            history_uid = history_uid.strip()
+
+        if history_uid and not history_exists(conf_uid, history_uid):
+            await websocket.send_json(
+                {"type": "error", "code": "history_not_found", "message": "history not found"}
+            )
+            await websocket.close()
+            return
+
+        if not history_uid:
+            history_uid = create_new_history(conf_uid)
+
+        config = override_llm_only_config(load_config())
+        meta = get_character_meta(config)
+
+        store_message(
+            conf_uid=conf_uid,
+            history_uid=history_uid,
+            role="human",
+            content=text,
+            name=meta["human_name"],
+        )
+
+        await websocket.send_json({"type": "session", "history_uid": history_uid})
+
+        try:
+            _, stream_iter, _ = await run_chat_stream(
+                conf_uid=conf_uid,
+                history_uid=history_uid,
+                text=text,
+                config=config,
+            )
+            full_response = ""
+            async for chunk in stream_iter:
+                if chunk:
+                    full_response += chunk
+                    await websocket.send_json({"type": "delta", "text": chunk})
+
+            store_message(
+                conf_uid=conf_uid,
+                history_uid=history_uid,
+                role="ai",
+                content=full_response,
+                name=meta["character_name"],
+                avatar=meta["avatar"],
+            )
+            await websocket.send_json({"type": "done", "text": full_response})
+        except LLMTimeoutError:
+            await websocket.send_json(
+                {"type": "error", "code": "llm_timeout", "message": "LLM timeout"}
+            )
+        except LLMError:
+            await websocket.send_json(
+                {"type": "error", "code": "llm_error", "message": "LLM error"}
+            )
+    except Exception as exc:
+        logger.error(f"WS error: {exc}")
+        try:
+            await websocket.send_json(
+                {"type": "error", "code": "server_error", "message": "server error"}
+            )
+        except Exception:
+            pass
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict, List
+from typing import Any, AsyncIterator, Dict, List
 
 from loguru import logger
 
@@ -114,6 +114,46 @@ async def _collect_llm_response(
             logger.warning("Tool calls received but tools are disabled")
             continue
     return output_text.strip()
+
+
+async def run_chat_stream(
+    conf_uid: str,
+    history_uid: str,
+    text: str,
+    config: Dict[str, Any],
+) -> tuple[str, AsyncIterator[str], BasicMemoryAgent]:
+    """Run streaming chat and return history_uid + async iterator."""
+    character_config = config.get("character_config", {})
+    agent_config = character_config.get("agent_config", {})
+    system_config = config.get("system_config", {})
+    persona_prompt = character_config.get("persona_prompt", "")
+    tool_prompts = system_config.get("tool_prompts", {})
+
+    system_prompt = _build_system_prompt(persona_prompt, tool_prompts)
+
+    messages, agent = _build_messages(
+        text=text,
+        conf_uid=conf_uid,
+        history_uid=history_uid,
+        system_prompt=system_prompt,
+        agent_config=agent_config,
+    )
+
+    async def stream_iter() -> AsyncIterator[str]:
+        try:
+            async for event in agent._llm.chat_completion(
+                messages, system_prompt, tools=None
+            ):
+                if isinstance(event, str):
+                    yield event
+                elif isinstance(event, list):
+                    logger.warning("Tool calls received but tools are disabled")
+        except asyncio.TimeoutError as exc:
+            raise LLMTimeoutError("LLM request timed out") from exc
+        except Exception as exc:
+            raise LLMError("LLM request failed") from exc
+
+    return history_uid, stream_iter(), agent
 
 
 async def run_chat_once(

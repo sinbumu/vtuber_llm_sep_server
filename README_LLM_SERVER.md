@@ -34,7 +34,7 @@ curl http://127.0.0.1:8000/health
 
 ---
 
-## 4) /v1/chat (stub 단계)
+## 4) /v1/chat
 
 ```powershell
 curl -X POST http://127.0.0.1:8000/v1/chat ^
@@ -44,7 +44,7 @@ curl -X POST http://127.0.0.1:8000/v1/chat ^
 
 응답:
 ```json
-{"history_uid":"...","text":"[stub] 안녕"}
+{"history_uid":"...","text":"..."}
 ```
 
 ---
@@ -61,8 +61,35 @@ curl -X POST http://127.0.0.1:8000/v1/chat ^
 
 ---
 
+## 6) WebSocket 스트리밍 (Plan4)
+
+요청(JSON):
+```json
+{
+  "conf_uid": "mao_pro_001",
+  "history_uid": null,
+  "text": "안녕"
+}
+```
+
+응답(JSON events):
+```json
+{ "type": "session", "history_uid": "..." }
+{ "type": "delta", "text": "..." }
+{ "type": "done", "text": "full response" }
+```
+
+에러:
+```json
+{ "type": "error", "code": "history_not_found" }
+{ "type": "error", "code": "llm_timeout" }
+{ "type": "error", "code": "llm_error" }
+```
+
+---
+
 ## 참고
 
 - LLM-only 서버는 **ASR/TTS/Live2D/VAD/OBS를 초기화하지 않습니다.**
 - `mem0_agent`는 미구현 상태이므로 **기본 비활성화**됩니다.
-- Plan3에서 LLM 호출이 연결되면 stub 응답은 실제 응답으로 대체됩니다.
+- /v1/ws/chat 스트리밍은 LLM 응답 조각을 delta로 전송합니다.
