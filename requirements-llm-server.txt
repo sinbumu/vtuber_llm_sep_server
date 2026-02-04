@@ -5,3 +5,4 @@ pydantic
 loguru
 pyyaml
 chardet
+openai

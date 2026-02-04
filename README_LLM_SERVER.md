@@ -49,6 +49,18 @@ curl -X POST http://127.0.0.1:8000/v1/chat ^
 
 ---
 
+## 5) Persona 적용 테스트 (Plan3 이후)
+
+```powershell
+curl -X POST http://127.0.0.1:8000/v1/chat ^
+  -H "Content-Type: application/json" ^
+  -d "{\"conf_uid\":\"mao_pro_001\",\"history_uid\":null,\"text\":\"너 누구야?\"}"
+```
+
+의도: `conf.yaml`의 `persona_prompt`가 반영된 응답이 나오는지 확인
+
+---
+
 ## 참고
 
 - LLM-only 서버는 **ASR/TTS/Live2D/VAD/OBS를 초기화하지 않습니다.**
