@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 
 from fastapi import FastAPI, HTTPException, WebSocket
@@ -35,10 +36,20 @@ app = FastAPI(title="Open-LLM-VTuber LLM-only Server")
 @app.on_event("startup")
 async def on_startup() -> None:
     ensure_base_dir()
+    enable_mcp = os.getenv("LLM_SERVER_ENABLE_MCP", "0").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    app.state.mcp_enabled = enable_mcp
     config = load_config()
-    config = override_llm_only_config(config)
+    config = override_llm_only_config(config, enable_mcp=enable_mcp)
     validate_tool_prompts(config)
-    logger.info("LLM-only server initialized (ASR/TTS/VAD/Live2D disabled).")
+    logger.info(
+        "LLM-only server initialized (ASR/TTS/VAD/Live2D disabled). "
+        f"MCP={'on' if enable_mcp else 'off'}."
+    )
 
 
 @app.get("/health")
@@ -64,7 +75,8 @@ async def chat(request: ChatRequest) -> ChatResponse:
     if not history_uid:
         history_uid = create_new_history(conf_uid)
 
-    config = override_llm_only_config(load_config())
+    enable_mcp = bool(getattr(app.state, "mcp_enabled", False))
+    config = override_llm_only_config(load_config(), enable_mcp=enable_mcp)
     meta = get_character_meta(config)
 
     store_message(
@@ -127,7 +139,8 @@ async def chat_ws(websocket: WebSocket) -> None:
         if not history_uid:
             history_uid = create_new_history(conf_uid)
 
-        config = override_llm_only_config(load_config())
+    enable_mcp = bool(getattr(app.state, "mcp_enabled", False))
+    config = override_llm_only_config(load_config(), enable_mcp=enable_mcp)
         meta = get_character_meta(config)
 
         store_message(

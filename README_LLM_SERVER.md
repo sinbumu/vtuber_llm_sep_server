@@ -40,6 +40,17 @@ $env:PYTHONPATH = "$PWD"
 uv run uvicorn llm_server.app:app --app-dir src --host 127.0.0.1 --port 8000
 ```
 
+MCP 기능을 쓰고 싶다면:
+
+```powershell
+$env:LLM_SERVER_ENABLE_MCP = "1"
+uv run uvicorn llm_server.app:app --app-dir src --host 127.0.0.1 --port 8000
+```
+
+조건:
+- `mcp_servers.json` 파일이 저장소 루트에 있어야 합니다.
+- MCP 서버 런타임(`npx`, `uvx`, `node`) 및 관련 파이썬 의존성이 설치되어 있어야 합니다.
+
 ---
 
 ## 3) 건강 체크

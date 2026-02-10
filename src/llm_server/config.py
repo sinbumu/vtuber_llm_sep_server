@@ -13,16 +13,23 @@ def load_config() -> Dict[str, Any]:
     return read_yaml("conf.yaml")
 
 
-def override_llm_only_config(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Apply LLM-only overrides to disable MCP and mem0."""
+def override_llm_only_config(
+    config: Dict[str, Any], enable_mcp: bool = False
+) -> Dict[str, Any]:
+    """Apply LLM-only overrides (optionally enable MCP)."""
     config = dict(config or {})
     character_config = dict(config.get("character_config", {}))
     agent_config = dict(character_config.get("agent_config", {}))
     agent_settings = dict(agent_config.get("agent_settings", {}))
     basic_memory = dict(agent_settings.get("basic_memory_agent", {}))
 
-    if basic_memory.get("use_mcpp", False):
-        logger.warning("LLM-only server: forcing use_mcpp=false")
+    if enable_mcp:
+        if not basic_memory.get("use_mcpp", False):
+            logger.info("LLM-only server: enabling MCP (use_mcpp=true)")
+        basic_memory["use_mcpp"] = True
+    else:
+        if basic_memory.get("use_mcpp", False):
+            logger.warning("LLM-only server: forcing use_mcpp=false")
         basic_memory["use_mcpp"] = False
 
     agent_settings["basic_memory_agent"] = basic_memory
@@ -34,6 +41,9 @@ def override_llm_only_config(config: Dict[str, Any]) -> Dict[str, Any]:
 
     character_config["agent_config"] = agent_config
     config["character_config"] = character_config
+    llm_server_config = dict(config.get("llm_server", {}))
+    llm_server_config["mcp_enabled"] = enable_mcp
+    config["llm_server"] = llm_server_config
     return config
 
 
