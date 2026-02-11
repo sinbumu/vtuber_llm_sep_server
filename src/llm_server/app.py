@@ -139,8 +139,8 @@ async def chat_ws(websocket: WebSocket) -> None:
         if not history_uid:
             history_uid = create_new_history(conf_uid)
 
-    enable_mcp = bool(getattr(app.state, "mcp_enabled", False))
-    config = override_llm_only_config(load_config(), enable_mcp=enable_mcp)
+        enable_mcp = bool(getattr(app.state, "mcp_enabled", False))
+        config = override_llm_only_config(load_config(), enable_mcp=enable_mcp)
         meta = get_character_meta(config)
 
         store_message(
