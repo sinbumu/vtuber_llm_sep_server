@@ -45,6 +45,10 @@ memory.db.bk
 server.log
 logs/*
 
+# Build artifacts
+build/
+dist/
+
 # Cache and models
 cache/*
 src/open_llm_vtuber/tts/asset
@@ -70,6 +74,11 @@ mem.json
 conf.yaml.backup
 
 *.exe
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
 
 tmp/
 private/

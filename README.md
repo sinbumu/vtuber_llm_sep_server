@@ -41,11 +41,29 @@ $body = @{
 Invoke-RestMethod -Uri "http://127.0.0.1:8000/v1/chat" -Method Post -ContentType "application/json" -Body $body
 ```
 
+## EXE 빌드 (Windows)
+
+### 1) PyInstaller 설치
+```powershell
+uv pip install pyinstaller
+```
+
+### 2) 빌드
+```powershell
+pyinstaller llm_server.spec
+```
+
+### 3) 실행
+```powershell
+.\dist\llm_server\llm_server.exe
+```
+
+옵션(환경변수):
+- `LLM_SERVER_HOST` (기본: `127.0.0.1`)
+- `LLM_SERVER_PORT` (기본: `8000`)
+- `LLM_SERVER_LOG_LEVEL` (기본: `info`)
+- `LLM_SERVER_ENABLE_MCP` (기본: `0`)
+
 ## 참고
 - 설정 파일: `conf.yaml`
 - 실행 가이드 상세: `README_LLM_SERVER.md`
-## 신규 서버 개발용 포크 프젝
-
-#### https://letspl.me/project/2560/shortcut
-
-위 프로젝트 팀 리딩을 진행중이고, 관련해서 오픈소스를 참고해서 서버 개발중.

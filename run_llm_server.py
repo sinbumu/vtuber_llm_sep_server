@@ -7,8 +7,6 @@ import sys
 
 import uvicorn
 
-from llm_server.utils import ensure_base_dir
-
 
 def _get_port(value: str | None, default: int = 8000) -> int:
     """Parse port from string with fallback.
@@ -37,6 +35,16 @@ def main() -> None:
     Returns:
         None
     """
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        base_dir = sys._MEIPASS
+        src_dir = os.path.join(base_dir, "src")
+        if base_dir not in sys.path:
+            sys.path.insert(0, base_dir)
+        if src_dir not in sys.path:
+            sys.path.insert(0, src_dir)
+
+    from llm_server.utils import ensure_base_dir
+
     ensure_base_dir()
     host = os.getenv("LLM_SERVER_HOST", "127.0.0.1")
     port = _get_port(os.getenv("LLM_SERVER_PORT"), 8000)
@@ -44,8 +52,10 @@ def main() -> None:
 
     app_dir = None if getattr(sys, "frozen", False) else "src"
 
+    from llm_server.app import app
+
     uvicorn.run(
-        "llm_server.app:app",
+        app,
         app_dir=app_dir,
         host=host,
         port=port,

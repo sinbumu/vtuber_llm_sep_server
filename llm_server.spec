@@ -6,7 +6,11 @@ from PyInstaller.building.build_main import Analysis, COLLECT, EXE, PYZ
 from PyInstaller.utils.hooks import collect_submodules
 
 
-hiddenimports = collect_submodules("open_llm_vtuber") + collect_submodules("llm_server")
+hiddenimports = (
+    collect_submodules("open_llm_vtuber")
+    + collect_submodules("llm_server")
+    + ["llm_server.app"]
+)
 
 datas = []
 if os.path.exists("conf.yaml"):
@@ -20,7 +24,7 @@ if os.path.isdir("prompts"):
 
 analysis = Analysis(
     ["run_llm_server.py"],
-    pathex=["."],
+    pathex=[".", "src"],
     binaries=[],
     datas=datas,
     hiddenimports=hiddenimports,
