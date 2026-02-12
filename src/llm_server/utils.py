@@ -8,6 +8,8 @@ from loguru import logger
 
 def get_base_dir() -> Path:
     """Return repository root directory."""
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS).resolve()
     return Path(__file__).resolve().parents[2]
 
 

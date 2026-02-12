@@ -119,6 +119,37 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8000/v1/chat" -Method Post -ContentType
 
 ---
 
+## 7) EXE 빌드 (PyInstaller)
+
+> Unity 앱에서 **자식 프로세스**로 실행하기 위한 Windows exe 빌드용.
+
+### 7-1) PyInstaller 설치
+```powershell
+uv pip install pyinstaller
+```
+
+### 7-2) 빌드 실행
+```powershell
+pyinstaller llm_server.spec
+```
+
+결과:
+- `dist/llm_server/llm_server.exe` 생성
+- `conf.yaml`, `prompts/`, `mcp_servers.json`이 함께 포함됨
+
+### 7-3) 실행
+```powershell
+.\dist\llm_server\llm_server.exe
+```
+
+옵션(환경변수):
+- `LLM_SERVER_HOST` (기본: `127.0.0.1`)
+- `LLM_SERVER_PORT` (기본: `8000`)
+- `LLM_SERVER_LOG_LEVEL` (기본: `info`)
+- `LLM_SERVER_ENABLE_MCP` (기본: `0`)
+
+---
+
 ## 참고
 
 - LLM-only 서버는 **ASR/TTS/Live2D/VAD/OBS를 초기화하지 않습니다.**
