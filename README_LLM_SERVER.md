@@ -150,6 +150,29 @@ pyinstaller llm_server.spec
 
 ---
 
+## 8) 관리 API (초안)
+
+### 8-1) 현재 설정 조회
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/admin/current-config" -Method Get
+```
+
+설명:
+- 현재 적용 기준의 설정 요약을 반환합니다.
+- 민감값(`api_key` 등)은 마스킹됩니다.
+
+### 8-2) 설정 재로드 검증
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/admin/reload-config" -Method Post
+```
+
+설명:
+- `conf.yaml`과 prompt 파일을 다시 읽어 검증합니다.
+- 현재 구조에서는 **적용 가능한 항목은 다음 요청부터 반영**됩니다.
+- `host`, `port`, `LLM_SERVER_ENABLE_MCP` 같은 항목은 재시작 필요로 반환됩니다.
+
+---
+
 ## 참고
 
 - LLM-only 서버는 **ASR/TTS/Live2D/VAD/OBS를 초기화하지 않습니다.**
