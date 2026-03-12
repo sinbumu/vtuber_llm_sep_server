@@ -11,6 +11,12 @@ Open-LLM-VTuber에서 **ASR/TTS/Live2D/프론트**를 제거하고,
 
 ## 개발 실행 (Windows / PowerShell)
 
+### 0) venv 환경에서 할 경우
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+```
+
 ### 1) 의존성 설치
 ```powershell
 uv sync
