@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
 import os
 import sys
+from pathlib import Path
+
 from loguru import logger
 
 
@@ -23,3 +24,10 @@ def ensure_base_dir() -> Path:
     except Exception as exc:
         logger.error(f"Failed to set BASE_DIR: {exc}")
     return base_dir
+
+
+def get_runtime_dir() -> Path:
+    """Return the external runtime directory for config discovery."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path.cwd().resolve()

@@ -33,6 +33,13 @@ uv pip install -r requirements-llm-server.txt
 uv run uvicorn llm_server.app:app --app-dir src --host 127.0.0.1 --port 8000
 ```
 
+외부 설정 파일 경로를 직접 지정하려면:
+
+```powershell
+$env:LLM_SERVER_CONFIG_PATH = "C:\path\to\conf.yaml"
+uv run uvicorn llm_server.app:app --app-dir src --host 127.0.0.1 --port 8000
+```
+
 만약 `prompts` 모듈 import 오류가 난다면, 아래처럼 `PYTHONPATH`를 추가해 실행하세요:
 
 ```powershell
@@ -147,6 +154,7 @@ pyinstaller llm_server.spec
 - `LLM_SERVER_PORT` (기본: `8000`)
 - `LLM_SERVER_LOG_LEVEL` (기본: `info`)
 - `LLM_SERVER_ENABLE_MCP` (기본: `0`)
+- `LLM_SERVER_CONFIG_PATH` (선택: 외부 `conf.yaml` 경로)
 
 ---
 
@@ -160,6 +168,10 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8000/admin/current-config" -Method Get
 설명:
 - 현재 적용 기준의 설정 요약을 반환합니다.
 - 민감값(`api_key` 등)은 마스킹됩니다.
+- 설정 파일 우선순위:
+  1. `LLM_SERVER_CONFIG_PATH`
+  2. exe/현재 실행 디렉토리의 `conf.yaml`
+  3. 번들/리포 기본 `conf.yaml`
 
 ### 8-2) 설정 재로드 검증
 ```powershell

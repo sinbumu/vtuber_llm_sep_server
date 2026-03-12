@@ -64,10 +64,7 @@ async def admin_current_config() -> dict[str, object]:
     """Return the current effective config summary."""
     enable_mcp = bool(getattr(app.state, "mcp_enabled", False))
     try:
-        return {
-            "success": True,
-            "config": get_current_config_report(enable_mcp),
-        }
+        return get_current_config_report(enable_mcp)
     except Exception as exc:
         logger.error(f"Failed to build current-config report: {exc}")
         raise HTTPException(status_code=500, detail="config_report_failed")

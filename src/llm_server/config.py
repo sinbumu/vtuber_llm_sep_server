@@ -6,7 +6,7 @@ from typing import Any, Dict
 
 from loguru import logger
 
-from .utils import get_base_dir
+from .utils import get_base_dir, get_runtime_dir
 from open_llm_vtuber.config_manager.utils import read_yaml, validate_config
 
 
@@ -30,13 +30,55 @@ RESTART_REQUIRED_FIELDS = [
     "LLM_SERVER_PORT",
     "LLM_SERVER_LOG_LEVEL",
     "LLM_SERVER_ENABLE_MCP",
-    "conf.yaml path",
+    "LLM_SERVER_CONFIG_PATH",
 ]
 
 
+def resolve_config_path() -> str:
+    """Resolve the active config path with external-file priority.
+
+    Resolution order:
+    1. `LLM_SERVER_CONFIG_PATH`
+    2. `<runtime_dir>/conf.yaml`
+    3. `<base_dir>/conf.yaml`
+
+    Returns:
+        The resolved config path as a string.
+
+    Raises:
+        FileNotFoundError: If no valid config file is found.
+    """
+    runtime_dir = get_runtime_dir()
+    base_dir = get_base_dir()
+    configured_path = os.getenv("LLM_SERVER_CONFIG_PATH")
+
+    candidates: list[str] = []
+    if configured_path:
+        if os.path.isabs(configured_path):
+            candidates.append(configured_path)
+        else:
+            candidates.append(str((runtime_dir / configured_path).resolve()))
+
+    candidates.append(str((runtime_dir / "conf.yaml").resolve()))
+    candidates.append(str((base_dir / "conf.yaml").resolve()))
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        normalized = os.path.normcase(os.path.normpath(candidate))
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        if os.path.exists(candidate):
+            return candidate
+
+    raise FileNotFoundError(
+        "No configuration file found. Checked: " + ", ".join(candidates)
+    )
+
+
 def load_config() -> Dict[str, Any]:
-    """Load raw config from conf.yaml without engine initialization."""
-    return read_yaml("conf.yaml")
+    """Load raw config from the resolved config path without engine initialization."""
+    return read_yaml(resolve_config_path())
 
 
 def override_llm_only_config(
@@ -178,6 +220,56 @@ def _collect_tool_prompt_warnings(config: Dict[str, Any]) -> list[str]:
     return warnings
 
 
+def _build_unity_config_summary(
+    effective_config: Dict[str, Any], enable_mcp: bool
+) -> Dict[str, Any]:
+    """Build a compact config summary suitable for Unity DTOs.
+
+    Args:
+        effective_config: Effective config after overrides.
+        enable_mcp: Whether MCP is enabled at process runtime.
+
+    Returns:
+        Compact summary dictionary.
+    """
+    character_config = effective_config.get("character_config", {})
+    agent_config = character_config.get("agent_config", {})
+    agent_settings = agent_config.get("agent_settings", {})
+    basic_memory = agent_settings.get("basic_memory_agent", {})
+    llm_provider = basic_memory.get("llm_provider")
+    llm_configs = agent_config.get("llm_configs", {})
+    llm_config = llm_configs.get(llm_provider, {}) if llm_provider else {}
+    system_config = effective_config.get("system_config", {})
+    persona_prompt = character_config.get("persona_prompt", "") or ""
+
+    return {
+        "character": {
+            "confName": character_config.get("conf_name"),
+            "confUid": character_config.get("conf_uid"),
+            "characterName": character_config.get("character_name"),
+            "humanName": character_config.get("human_name"),
+            "avatar": character_config.get("avatar"),
+        },
+        "llm": {
+            "provider": llm_provider,
+            "model": llm_config.get("model"),
+            "baseUrl": llm_config.get("base_url"),
+            "temperature": llm_config.get("temperature"),
+            "apiKeyConfigured": bool(llm_config.get("llm_api_key")),
+        },
+        "conversation": {
+            "fasterFirstResponse": basic_memory.get("faster_first_response"),
+            "segmentMethod": basic_memory.get("segment_method"),
+            "mcpEnabled": enable_mcp,
+            "mcpEnabledServers": basic_memory.get("mcp_enabled_servers", []),
+        },
+        "prompts": {
+            "personaPromptLength": len(persona_prompt),
+            "toolPrompts": system_config.get("tool_prompts", {}),
+        },
+    }
+
+
 def get_current_config_report(enable_mcp: bool) -> Dict[str, Any]:
     """Build a safe summary of the current effective config.
 
@@ -190,48 +282,18 @@ def get_current_config_report(enable_mcp: bool) -> Dict[str, Any]:
     raw_config = load_config()
     effective_config = override_llm_only_config(raw_config, enable_mcp=enable_mcp)
 
-    character_config = effective_config.get("character_config", {})
-    agent_config = character_config.get("agent_config", {})
-    agent_settings = agent_config.get("agent_settings", {})
-    basic_memory = agent_settings.get("basic_memory_agent", {})
-    llm_provider = basic_memory.get("llm_provider")
-    llm_configs = agent_config.get("llm_configs", {})
-    llm_config = llm_configs.get(llm_provider, {}) if llm_provider else {}
-    system_config = effective_config.get("system_config", {})
-
     return {
-        "config_path": "conf.yaml",
+        "status": "ok",
+        "configPath": resolve_config_path(),
         "process": {
             "host": os.getenv("LLM_SERVER_HOST", "127.0.0.1"),
-            "port": os.getenv("LLM_SERVER_PORT", "8000"),
+            "port": int(os.getenv("LLM_SERVER_PORT", "8000")),
             "log_level": os.getenv("LLM_SERVER_LOG_LEVEL", "info"),
         },
-        "runtime_flags": {
-            "mcp_enabled": enable_mcp,
-        },
-        "character": {
-            "conf_name": character_config.get("conf_name"),
-            "conf_uid": character_config.get("conf_uid"),
-            "character_name": character_config.get("character_name"),
-            "human_name": character_config.get("human_name"),
-            "avatar": character_config.get("avatar"),
-        },
-        "llm": {
-            "provider": llm_provider,
-            "provider_config": _mask_sensitive_values(llm_config),
-        },
-        "conversation": {
-            "faster_first_response": basic_memory.get("faster_first_response"),
-            "segment_method": basic_memory.get("segment_method"),
-            "mcp_enabled_servers": basic_memory.get("mcp_enabled_servers", []),
-        },
-        "prompts_summary": {
-            "persona_prompt": character_config.get("persona_prompt", ""),
-            "tool_prompts": system_config.get("tool_prompts", {}),
-        },
-        "reload_policy": {
-            "runtime_applied_on_next_request": RUNTIME_RELOAD_SUPPORTED_FIELDS,
-            "restart_required": RESTART_REQUIRED_FIELDS,
+        "configSummary": _build_unity_config_summary(effective_config, enable_mcp),
+        "reloadPolicy": {
+            "runtimeAppliedOnNextRequest": RUNTIME_RELOAD_SUPPORTED_FIELDS,
+            "restartRequired": RESTART_REQUIRED_FIELDS,
         },
     }
 
@@ -258,17 +320,21 @@ def reload_config_report(enable_mcp: bool) -> Dict[str, Any]:
     warnings = _collect_tool_prompt_warnings(effective_config) if effective_config else []
 
     return {
+        "status": "ok" if not errors else "error",
         "success": not errors,
         "message": (
             "Config validated. Runtime-supported changes will apply on the next request."
             if not errors
             else "Config reload validation failed."
         ),
-        "runtime_applied_on_next_request": RUNTIME_RELOAD_SUPPORTED_FIELDS,
-        "restart_required": RESTART_REQUIRED_FIELDS,
+        "configPath": resolve_config_path() if not errors else None,
+        "runtimeAppliedOnNextRequest": RUNTIME_RELOAD_SUPPORTED_FIELDS,
+        "restartRequired": RESTART_REQUIRED_FIELDS,
         "warnings": warnings,
         "errors": errors,
-        "current_config": (
-            get_current_config_report(enable_mcp) if not errors else None
+        "configSummary": (
+            _build_unity_config_summary(effective_config, enable_mcp)
+            if not errors
+            else None
         ),
     }
