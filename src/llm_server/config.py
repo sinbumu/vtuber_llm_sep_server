@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from typing import Any, Dict
 
@@ -196,10 +197,16 @@ def get_current_config_report(enable_mcp: bool) -> Dict[str, Any]:
     llm_provider = basic_memory.get("llm_provider")
     llm_configs = agent_config.get("llm_configs", {})
     llm_config = llm_configs.get(llm_provider, {}) if llm_provider else {}
+    system_config = effective_config.get("system_config", {})
 
     return {
         "config_path": "conf.yaml",
-        "runtime": {
+        "process": {
+            "host": os.getenv("LLM_SERVER_HOST", "127.0.0.1"),
+            "port": os.getenv("LLM_SERVER_PORT", "8000"),
+            "log_level": os.getenv("LLM_SERVER_LOG_LEVEL", "info"),
+        },
+        "runtime_flags": {
             "mcp_enabled": enable_mcp,
         },
         "character": {
@@ -213,13 +220,19 @@ def get_current_config_report(enable_mcp: bool) -> Dict[str, Any]:
             "provider": llm_provider,
             "provider_config": _mask_sensitive_values(llm_config),
         },
-        "prompts": {
-            "persona_prompt": character_config.get("persona_prompt", ""),
-            "tool_prompts": effective_config.get("system_config", {}).get(
-                "tool_prompts", {}
-            ),
+        "conversation": {
+            "faster_first_response": basic_memory.get("faster_first_response"),
+            "segment_method": basic_memory.get("segment_method"),
+            "mcp_enabled_servers": basic_memory.get("mcp_enabled_servers", []),
         },
-        "effective_config": _mask_sensitive_values(effective_config),
+        "prompts_summary": {
+            "persona_prompt": character_config.get("persona_prompt", ""),
+            "tool_prompts": system_config.get("tool_prompts", {}),
+        },
+        "reload_policy": {
+            "runtime_applied_on_next_request": RUNTIME_RELOAD_SUPPORTED_FIELDS,
+            "restart_required": RESTART_REQUIRED_FIELDS,
+        },
     }
 
 
