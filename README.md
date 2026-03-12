@@ -26,6 +26,12 @@ uv pip install -r requirements-llm-server.txt
 uv run uvicorn llm_server.app:app --app-dir src --host 127.0.0.1 --port 8000
 ```
 
+외부 설정 파일을 지정하려면:
+```powershell
+$env:LLM_SERVER_CONFIG_PATH = "C:\path\to\conf.yaml"
+uv run uvicorn llm_server.app:app --app-dir src --host 127.0.0.1 --port 8000
+```
+
 ### 3) 테스트
 ```powershell
 Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -Method Get
@@ -63,6 +69,23 @@ pyinstaller llm_server.spec
 - `LLM_SERVER_PORT` (기본: `8000`)
 - `LLM_SERVER_LOG_LEVEL` (기본: `info`)
 - `LLM_SERVER_ENABLE_MCP` (기본: `0`)
+- `LLM_SERVER_CONFIG_PATH` (선택: 외부 `conf.yaml` 경로)
+
+설정 파일 우선순위:
+1. `LLM_SERVER_CONFIG_PATH`
+2. exe/현재 실행 디렉토리의 `conf.yaml`
+3. 번들/리포 기본 `conf.yaml`
+
+권장 배포:
+- Unity 프로젝트 또는 배포 폴더에 `llm_server.exe`와 외부 `conf.yaml`를 함께 둠
+- Unity가 설정 변경 시 외부 `conf.yaml`를 수정
+- MVP에서는 설정 변경 후 서버 재시작
+- 일부 설정은 `/admin/reload-config`로 다음 요청부터 반영 가능
+
+## Unity 연동
+
+- Unity 포함/프로세스 실행/설정 파일 관리 가이드: `UNITY_GUIDE.md`
+- 참고용 외부 설정 예시: `conf.unity.example.yaml`
 
 ## 참고
 - 설정 파일: `conf.yaml`

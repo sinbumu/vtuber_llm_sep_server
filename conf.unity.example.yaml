@@ -1,0 +1,76 @@
+system_config:
+  conf_version: "v1.2.1"
+  host: "localhost"
+  port: 12393
+  config_alts_dir: "characters"
+  tool_prompts:
+    live2d_expression_prompt: "live2d_expression_prompt"
+    group_conversation_prompt: "group_conversation_prompt"
+    mcp_prompt: "mcp_prompt"
+    proactive_speak_prompt: "proactive_speak_prompt"
+
+character_config:
+  conf_name: "unity_default"
+  conf_uid: "unity_default_001"
+  live2d_model_name: "mao_pro"
+  character_name: "Assistant"
+  avatar: ""
+  human_name: "User"
+  persona_prompt: |
+    You are a helpful AI assistant for a Unity application.
+    Answer clearly and naturally.
+
+  agent_config:
+    conversation_agent_choice: "basic_memory_agent"
+
+    agent_settings:
+      basic_memory_agent:
+        llm_provider: "gemini_llm"
+        faster_first_response: true
+        segment_method: "pysbd"
+        use_mcpp: false
+        mcp_enabled_servers: []
+
+    llm_configs:
+      gemini_llm:
+        llm_api_key: "YOUR_API_KEY"
+        base_url: "https://generativelanguage.googleapis.com/v1beta/openai"
+        model: "gemini-2.5-flash"
+        temperature: 0.7
+
+      ollama_llm:
+        base_url: "http://localhost:11434/v1"
+        llm_api_key: "dummy"
+        model: "qwen2.5:latest"
+        temperature: 1.0
+        keep_alive: -1
+        unload_at_exit: true
+
+  asr_config:
+    asr_model: "sherpa_onnx_asr"
+
+    sherpa_onnx_asr:
+      model_type: "sense_voice"
+      sense_voice: "./models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/model.int8.onnx"
+      tokens: "./models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/tokens.txt"
+      num_threads: 4
+      use_itn: true
+      provider: "cpu"
+
+  tts_config:
+    tts_model: "edge_tts"
+
+    edge_tts:
+      voice: "en-US-AnaNeural"
+
+  vad_config:
+    vad_model: null
+
+  tts_preprocessor_config:
+    remove_special_char: true
+    ignore_brackets: true
+    ignore_parentheses: true
+    ignore_asterisks: true
+    ignore_angle_brackets: true
+    translator_config:
+      translate_audio: false
