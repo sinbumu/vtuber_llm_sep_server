@@ -102,14 +102,6 @@ async def chat(request: ChatRequest) -> ChatResponse:
     config = override_llm_only_config(load_config(), enable_mcp=enable_mcp)
     meta = get_character_meta(config)
 
-    store_message(
-        conf_uid=conf_uid,
-        history_uid=history_uid,
-        role="human",
-        content=text,
-        name=meta["human_name"],
-    )
-
     try:
         assistant_text = await run_chat_once(
             conf_uid=conf_uid,
@@ -127,6 +119,13 @@ async def chat(request: ChatRequest) -> ChatResponse:
         logger.error(f"Unexpected LLM failure: {exc}")
         raise HTTPException(status_code=502, detail="llm_error")
 
+    store_message(
+        conf_uid=conf_uid,
+        history_uid=history_uid,
+        role="human",
+        content=text,
+        name=meta["human_name"],
+    )
     store_message(
         conf_uid=conf_uid,
         history_uid=history_uid,
@@ -166,14 +165,6 @@ async def chat_ws(websocket: WebSocket) -> None:
         config = override_llm_only_config(load_config(), enable_mcp=enable_mcp)
         meta = get_character_meta(config)
 
-        store_message(
-            conf_uid=conf_uid,
-            history_uid=history_uid,
-            role="human",
-            content=text,
-            name=meta["human_name"],
-        )
-
         await websocket.send_json({"type": "session", "history_uid": history_uid})
 
         try:
@@ -189,6 +180,13 @@ async def chat_ws(websocket: WebSocket) -> None:
                     full_response += chunk
                     await websocket.send_json({"type": "delta", "text": chunk})
 
+            store_message(
+                conf_uid=conf_uid,
+                history_uid=history_uid,
+                role="human",
+                content=text,
+                name=meta["human_name"],
+            )
             store_message(
                 conf_uid=conf_uid,
                 history_uid=history_uid,

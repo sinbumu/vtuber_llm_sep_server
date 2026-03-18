@@ -471,3 +471,12 @@
 
 현재 코드 기준으로 가장 현실적인 방향은  
 **"원본 history는 보존하고, 모델 입력만 `summary + recent window`로 가볍게 만들되, MVP는 `recent window only`부터 시작"** 하는 것이다.
+
+---
+
+## MVP Implementation Note
+
+- MVP 구현 방향은 `recent window only`로 선택한다.
+- 첫 적용 지점은 `BasicMemoryAgent._to_messages()` 직전의 pre-LLM message assembly다.
+- 기본 recent window 값은 `16`개 메시지다.
+- 원본 history JSON은 그대로 저장하고, 모델 입력만 줄인다.

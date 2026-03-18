@@ -83,6 +83,10 @@ class AgentFactory:
                 tool_manager=tool_manager,
                 tool_executor=tool_executor,
                 mcp_prompt_string=mcp_prompt_string,
+                recent_message_window=basic_memory_settings.get(
+                    "recent_message_window",
+                    BasicMemoryAgent.DEFAULT_RECENT_MESSAGE_WINDOW,
+                ),
             )
 
         elif conversation_agent_choice == "mem0_agent":

@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import sys
+from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from loguru import logger
-import sys
 
+from open_llm_vtuber.agent.agents.basic_memory_agent import BasicMemoryAgent
 from open_llm_vtuber.agent.stateless_llm_factory import LLMFactory
 from open_llm_vtuber.agent.input_types import BatchInput, TextData, TextSource
-from open_llm_vtuber.agent.agents.basic_memory_agent import BasicMemoryAgent
 from open_llm_vtuber.chat_history_manager import _get_safe_history_path
+
 from .utils import get_base_dir
 from .mcp_bridge import MCPComponents, init_mcp_components
 from open_llm_vtuber.agent.output_types import SentenceOutput
@@ -33,7 +35,7 @@ def history_exists(conf_uid: str, history_uid: str) -> bool:
     except Exception as exc:
         logger.warning(f"Invalid history path: {exc}")
         return False
-    return history_path.exists()
+    return Path(history_path).exists()
 
 
 def _build_system_prompt(
@@ -112,6 +114,10 @@ def _build_agent(
         tool_manager=mcp_components.tool_manager if mcp_components else None,
         tool_executor=mcp_components.tool_executor if mcp_components else None,
         mcp_prompt_string=mcp_components.mcp_prompt_string if mcp_components else "",
+        recent_message_window=basic_memory_settings.get(
+            "recent_message_window",
+            BasicMemoryAgent.DEFAULT_RECENT_MESSAGE_WINDOW,
+        ),
     )
 
     if history_uid:

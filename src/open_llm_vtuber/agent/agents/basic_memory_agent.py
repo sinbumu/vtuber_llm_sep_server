@@ -34,6 +34,7 @@ class BasicMemoryAgent(AgentInterface):
     """Agent with basic chat memory and tool calling support."""
 
     _system: str = "You are a helpful assistant."
+    DEFAULT_RECENT_MESSAGE_WINDOW: int = 16
 
     def __init__(
         self,
@@ -49,6 +50,7 @@ class BasicMemoryAgent(AgentInterface):
         tool_manager: Optional[ToolManager] = None,
         tool_executor: Optional[ToolExecutor] = None,
         mcp_prompt_string: str = "",
+        recent_message_window: int = DEFAULT_RECENT_MESSAGE_WINDOW,
     ):
         """Initialize agent with LLM and configuration."""
         super().__init__()
@@ -67,6 +69,7 @@ class BasicMemoryAgent(AgentInterface):
         self._tool_executor = tool_executor
         self._mcp_prompt_string = mcp_prompt_string
         self._json_detector = StreamJSONDetector()
+        self._recent_message_window = max(int(recent_message_window), 0)
 
         self._formatted_tools_openai = []
         self._formatted_tools_claude = []
@@ -239,9 +242,24 @@ class BasicMemoryAgent(AgentInterface):
 
         return "\n".join(message_parts).strip()
 
+    def _build_recent_memory_window(self) -> list[dict[str, Any]]:
+        """Build the recent in-memory window used for model input."""
+        if self._recent_message_window == 0:
+            return self._memory.copy()
+
+        if len(self._memory) <= self._recent_message_window:
+            return self._memory.copy()
+
+        recent_messages = self._memory[-self._recent_message_window :]
+        logger.debug(
+            "Compacting model input from "
+            f"{len(self._memory)} to {len(recent_messages)} memory messages."
+        )
+        return recent_messages.copy()
+
     def _to_messages(self, input_data: BatchInput) -> List[Dict[str, Any]]:
         """Prepare messages for LLM API call."""
-        messages = self._memory.copy()
+        messages = self._build_recent_memory_window()
         user_content = []
         text_prompt = self._to_text_prompt(input_data)
         if text_prompt:
