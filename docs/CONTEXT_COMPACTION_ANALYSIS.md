@@ -478,5 +478,5 @@
 
 - MVP 구현 방향은 `recent window only`로 선택한다.
 - 첫 적용 지점은 `BasicMemoryAgent._to_messages()` 직전의 pre-LLM message assembly다.
-- 기본 recent window 값은 `16`개 메시지다.
+- 기본 recent window 값은 `32`개 메시지다.
 - 원본 history JSON은 그대로 저장하고, 모델 입력만 줄인다.

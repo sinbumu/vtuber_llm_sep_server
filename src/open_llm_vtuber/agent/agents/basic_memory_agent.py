@@ -34,7 +34,7 @@ class BasicMemoryAgent(AgentInterface):
     """Agent with basic chat memory and tool calling support."""
 
     _system: str = "You are a helpful assistant."
-    DEFAULT_RECENT_MESSAGE_WINDOW: int = 16
+    DEFAULT_RECENT_MESSAGE_WINDOW: int = 32
 
     def __init__(
         self,
