@@ -68,6 +68,18 @@ character_config:
         # 'Plus' means that it has the ability to call tools by using OpenAI API.
         use_mcpp: True
         mcp_enabled_servers: ["time", "ddg-search"] # Enabled MCP servers
+        # How many recent messages to keep when using recent-window mode
+        recent_message_window: 32
+        context_compaction:
+          enabled: false
+          mode: 'recent_window_only'
+          target_message_count: 24
+          trigger_message_count: 28
+          max_message_count: 32
+          min_messages_to_compact: 4
+          summarizer: 'same_llm'
+          summarizer_model: null
+          summarizer_timeout_sec: 15
 
       letta_agent:
         host: 'localhost' # Host address

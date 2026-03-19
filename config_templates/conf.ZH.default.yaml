@@ -68,6 +68,18 @@ character_config:
         # 'Plus' 意味着它包含了通过 OpenAI API 调用工具的能力。
         use_mcpp: False
         mcp_enabled_servers: ["time", "ddg-search"] # 启用的 MCP 服务器
+        # 使用 recent-window 模式时保留的最近消息数
+        recent_message_window: 32
+        context_compaction:
+          enabled: false
+          mode: 'recent_window_only'
+          target_message_count: 24
+          trigger_message_count: 28
+          max_message_count: 32
+          min_messages_to_compact: 4
+          summarizer: 'same_llm'
+          summarizer_model: null
+          summarizer_timeout_sec: 15
 
       hume_ai_agent:
         api_key: ''

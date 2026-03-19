@@ -158,7 +158,38 @@ pyinstaller llm_server.spec
 
 ---
 
-## 8) 관리 API (초안)
+## 8) Context Compaction 설정
+
+`basic_memory_agent` 아래에 다음 설정을 둘 수 있습니다:
+
+```yaml
+character_config:
+  agent_config:
+    agent_settings:
+      basic_memory_agent:
+        recent_message_window: 32
+        context_compaction:
+          enabled: true
+          mode: "summary_recent_window"
+          target_message_count: 24
+          trigger_message_count: 28
+          max_message_count: 32
+          min_messages_to_compact: 4
+          summarizer: "same_llm"
+          summarizer_model: null
+          summarizer_timeout_sec: 15
+```
+
+설명:
+- `recent_message_window`: recent-window 경로에서 유지할 최근 메시지 수
+- `context_compaction.enabled`: summary compaction on/off
+- `mode`: `recent_window_only` 또는 `summary_recent_window`
+- `target/trigger/max`: summary 후 목표치, 시작 기준, live buffer 상한
+- summary는 응답 후 백그라운드에서 생성되며, history metadata에 저장됩니다.
+
+---
+
+## 9) 관리 API (초안)
 
 ### 8-1) 현재 설정 조회
 ```powershell

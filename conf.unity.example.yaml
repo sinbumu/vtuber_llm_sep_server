@@ -30,6 +30,17 @@ character_config:
         segment_method: "pysbd"
         use_mcpp: false
         mcp_enabled_servers: []
+        recent_message_window: 32
+        context_compaction:
+          enabled: false
+          mode: "recent_window_only"
+          target_message_count: 24
+          trigger_message_count: 28
+          max_message_count: 32
+          min_messages_to_compact: 4
+          summarizer: "same_llm"
+          summarizer_model: null
+          summarizer_timeout_sec: 15
 
     llm_configs:
       gemini_llm:
@@ -74,3 +85,4 @@ character_config:
     ignore_angle_brackets: true
     translator_config:
       translate_audio: false
+      translate_provider: "deeplx"

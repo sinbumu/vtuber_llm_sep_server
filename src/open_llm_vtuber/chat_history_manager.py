@@ -3,17 +3,121 @@ import re
 import json
 import uuid
 from datetime import datetime
-from typing import Literal, List, TypedDict, Optional
+from typing import Any, Literal, List, TypedDict, Optional
 from loguru import logger
 
 
 class HistoryMessage(TypedDict):
-    role: Literal["human", "ai"]
+    role: Literal["human", "ai", "system"]
     timestamp: str
     content: str
+    message_index: int
     # Optional display information for the message
     name: Optional[str]
     avatar: Optional[str]
+
+
+def _default_summary() -> dict[str, Any]:
+    """Return the default summary metadata payload."""
+    return {
+        "text": "",
+        "summary_upto_index": 0,
+        "updated_at": None,
+        "source_message_range": {
+            "start": None,
+            "end": None,
+        },
+        "persona_hash": None,
+        "version": 1,
+    }
+
+
+def _default_summary_job() -> dict[str, Any]:
+    """Return the default summary job metadata payload."""
+    return {
+        "status": "idle",
+        "requested_at": None,
+        "started_at": None,
+        "finished_at": None,
+        "last_error": None,
+        "pending_from_index": None,
+        "pending_to_index": None,
+    }
+
+
+def _default_metadata() -> dict[str, Any]:
+    """Return the default metadata payload for a history file."""
+    return {
+        "role": "metadata",
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "next_message_index": 1,
+        "summary": _default_summary(),
+        "summary_job": _default_summary_job(),
+    }
+
+
+def _deep_merge_dict(base: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge nested dictionaries."""
+    merged = dict(base)
+    for key, value in updates.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge_dict(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _save_history_data(filepath: str, history_data: list[dict[str, Any]]) -> None:
+    """Persist history data to disk."""
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(history_data, f, ensure_ascii=False, indent=2)
+
+
+def _ensure_history_structure(
+    history_data: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], bool]:
+    """Ensure metadata and message indexes exist in loaded history data."""
+    changed = False
+
+    if not history_data or history_data[0].get("role") != "metadata":
+        history_data = [_default_metadata(), *history_data]
+        changed = True
+
+    metadata = _deep_merge_dict(_default_metadata(), history_data[0])
+    metadata["role"] = "metadata"
+    history_data[0] = metadata
+
+    next_index = 1
+    for item in history_data[1:]:
+        if item.get("role") == "metadata":
+            continue
+
+        message_index = item.get("message_index")
+        if not isinstance(message_index, int) or message_index <= 0:
+            item["message_index"] = next_index
+            changed = True
+            message_index = next_index
+
+        next_index = max(next_index, message_index + 1)
+
+    if metadata.get("next_message_index") != next_index:
+        metadata["next_message_index"] = next_index
+        changed = True
+
+    return history_data, changed
+
+
+def _load_history_data(filepath: str) -> list[dict[str, Any]]:
+    """Load, normalize, and optionally upgrade history data from disk."""
+    history_data: list[dict[str, Any]] = []
+    if os.path.exists(filepath):
+        with open(filepath, "r", encoding="utf-8") as f:
+            history_data = json.load(f)
+
+    history_data, changed = _ensure_history_structure(history_data)
+    if changed:
+        _save_history_data(filepath, history_data)
+    return history_data
 
 
 def _is_safe_filename(filename: str) -> bool:
@@ -74,14 +178,8 @@ def create_new_history(conf_uid: str) -> str:
     # Create history file with empty metadata
     try:
         filepath = os.path.join(conf_dir, f"{history_uid}.json")
-        initial_data = [
-            {
-                "role": "metadata",
-                "timestamp": datetime.now().isoformat(timespec="seconds"),
-            }
-        ]
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(initial_data, f, ensure_ascii=False, indent=2)
+        initial_data = [_default_metadata()]
+        _save_history_data(filepath, initial_data)
     except Exception as e:
         logger.error(f"Failed to create new history file: {e}")
         return ""
@@ -93,7 +191,7 @@ def create_new_history(conf_uid: str) -> str:
 def store_message(
     conf_uid: str,
     history_uid: str,
-    role: Literal["human", "ai"],
+    role: Literal["human", "ai", "system"],
     content: str,
     name: str | None = None,
     avatar: str | None = None,
@@ -118,20 +216,21 @@ def store_message(
     filepath = _get_safe_history_path(conf_uid, history_uid)
     logger.debug(f"Storing {role} message to {filepath}")
 
-    history_data = []
-    if os.path.exists(filepath):
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                history_data = json.load(f)
-        except Exception:
-            logger.error(f"Failed to load history file: {filepath}")
-            pass
+    try:
+        history_data = _load_history_data(filepath)
+    except Exception:
+        logger.error(f"Failed to load history file: {filepath}")
+        history_data = [_default_metadata()]
+
+    metadata = history_data[0]
+    message_index = int(metadata.get("next_message_index", 1))
 
     now_str = datetime.now().isoformat(timespec="seconds")
     new_item = {
         "role": role,
         "timestamp": now_str,
         "content": content,
+        "message_index": message_index,
     }
 
     # Add optional display information if provided
@@ -141,9 +240,8 @@ def store_message(
         new_item["avatar"] = avatar
 
     history_data.append(new_item)
-
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(history_data, f, ensure_ascii=False, indent=2)
+    metadata["next_message_index"] = message_index + 1
+    _save_history_data(filepath, history_data)
     logger.debug(f"Successfully stored {role} message")
 
 
@@ -157,9 +255,7 @@ def get_metadata(conf_uid: str, history_uid: str) -> dict:
         return {}
 
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            history_data = json.load(f)
-
+        history_data = _load_history_data(filepath)
         if history_data and history_data[0]["role"] == "metadata":
             return history_data[0]
     except Exception as e:
@@ -181,23 +277,9 @@ def update_metadate(conf_uid: str, history_uid: str, metadata: dict) -> bool:
         return False
 
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            history_data = json.load(f)
-
-        if history_data and history_data[0]["role"] == "metadata":
-            # Update existing metadata while preserving other fields
-            history_data[0].update(metadata)
-        else:
-            # Create new metadata with timestamp if none exists
-            new_metadata = {
-                "role": "metadata",
-                "timestamp": datetime.now().isoformat(timespec="seconds"),
-            }
-            new_metadata.update(metadata)  # Add new fields
-            history_data.insert(0, new_metadata)
-
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(history_data, f, ensure_ascii=False, indent=2)
+        history_data = _load_history_data(filepath)
+        history_data[0] = _deep_merge_dict(history_data[0], metadata)
+        _save_history_data(filepath, history_data)
 
         logger.debug(f"Updated metadata for history {history_uid}")
         return True
@@ -222,10 +304,8 @@ def get_history(conf_uid: str, history_uid: str) -> List[HistoryMessage]:
         return []
 
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            history_data = json.load(f)
-            # Filter out metadata
-            return [msg for msg in history_data if msg["role"] != "metadata"]
+        history_data = _load_history_data(filepath)
+        return [msg for msg in history_data if msg["role"] != "metadata"]
     except Exception:
         return []
 
@@ -265,26 +345,22 @@ def get_history_list(conf_uid: str) -> List[dict]:
             filepath = os.path.join(conf_dir, filename)
 
             try:
-                with open(filepath, "r", encoding="utf-8") as f:
-                    messages = json.load(f)
+                messages = _load_history_data(filepath)
+                # Filter out metadata for checking if history is empty
+                actual_messages = [msg for msg in messages if msg["role"] != "metadata"]
+                if not actual_messages:
+                    empty_history_uids.append(history_uid)
+                    continue
 
-                    # Filter out metadata for checking if history is empty
-                    actual_messages = [
-                        msg for msg in messages if msg["role"] != "metadata"
-                    ]
-                    if not actual_messages:
-                        empty_history_uids.append(history_uid)
-                        continue
-
-                    latest_message = actual_messages[-1]
-                    history_info = {
-                        "uid": history_uid,
-                        "latest_message": latest_message,
-                        "timestamp": (
-                            latest_message["timestamp"] if latest_message else None
-                        ),
-                    }
-                    histories.append(history_info)
+                latest_message = actual_messages[-1]
+                history_info = {
+                    "uid": history_uid,
+                    "latest_message": latest_message,
+                    "timestamp": (
+                        latest_message["timestamp"] if latest_message else None
+                    ),
+                }
+                histories.append(history_info)
             except Exception as e:
                 logger.error(f"Error reading history file {filename}: {e}")
                 continue
@@ -325,8 +401,7 @@ def modify_latest_message(
         return False
 
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            history_data = json.load(f)
+        history_data = _load_history_data(filepath)
 
         if not history_data:
             logger.warning("History is empty")
@@ -340,8 +415,7 @@ def modify_latest_message(
             return False
 
         latest_message["content"] = new_content
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(history_data, f, ensure_ascii=False, indent=2)
+        _save_history_data(filepath, history_data)
 
         logger.debug(f"Successfully modified latest {role} message")
         return True

@@ -33,6 +33,10 @@ class BasicMemoryAgentConfig(I18nMixin, BaseModel):
     segment_method: Literal["regex", "pysbd"] = Field("pysbd", alias="segment_method")
     use_mcpp: Optional[bool] = Field(False, alias="use_mcpp")
     mcp_enabled_servers: Optional[List[str]] = Field([], alias="mcp_enabled_servers")
+    recent_message_window: Optional[int] = Field(32, alias="recent_message_window")
+    context_compaction: Optional["ContextCompactionConfig"] = Field(
+        None, alias="context_compaction"
+    )
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "llm_provider": Description(
@@ -54,6 +58,69 @@ class BasicMemoryAgentConfig(I18nMixin, BaseModel):
         "mcp_enabled_servers": Description(
             en="List of MCP servers to enable for the agent",
             zh="为智能体启用 MCP 服务器列表",
+        ),
+        "recent_message_window": Description(
+            en="How many recent messages to include in model input for the recent-window path",
+            zh="recent-window 路径下传给模型的最近消息数量",
+        ),
+        "context_compaction": Description(
+            en="Summary plus recent-window compaction settings for long conversations",
+            zh="长对话的 summary 加 recent-window 压缩设置",
+        ),
+    }
+
+
+class ContextCompactionConfig(I18nMixin, BaseModel):
+    """Configuration for context compaction behavior."""
+
+    enabled: Optional[bool] = Field(False, alias="enabled")
+    mode: Literal["recent_window_only", "summary_recent_window"] = Field(
+        "recent_window_only", alias="mode"
+    )
+    target_message_count: Optional[int] = Field(24, alias="target_message_count")
+    trigger_message_count: Optional[int] = Field(28, alias="trigger_message_count")
+    max_message_count: Optional[int] = Field(32, alias="max_message_count")
+    min_messages_to_compact: Optional[int] = Field(4, alias="min_messages_to_compact")
+    summarizer: Optional[str] = Field("same_llm", alias="summarizer")
+    summarizer_model: Optional[str] = Field(None, alias="summarizer_model")
+    summarizer_timeout_sec: Optional[int] = Field(15, alias="summarizer_timeout_sec")
+
+    DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
+        "enabled": Description(
+            en="Whether context compaction is enabled",
+            zh="是否启用上下文压缩",
+        ),
+        "mode": Description(
+            en="Compaction mode to use",
+            zh="使用的压缩模式",
+        ),
+        "target_message_count": Description(
+            en="Recent raw message count to keep after summary succeeds",
+            zh="summary 完成后保留的最近原文消息数量",
+        ),
+        "trigger_message_count": Description(
+            en="Raw message count that triggers background summary generation",
+            zh="触发后台 summary 生成的原文消息数量",
+        ),
+        "max_message_count": Description(
+            en="Maximum raw message count allowed in the live buffer",
+            zh="live buffer 中允许的最大原文消息数量",
+        ),
+        "min_messages_to_compact": Description(
+            en="Minimum number of messages to fold into summary in one pass",
+            zh="单次折叠进 summary 的最少消息数量",
+        ),
+        "summarizer": Description(
+            en="Summarizer strategy identifier",
+            zh="summary 生成策略标识",
+        ),
+        "summarizer_model": Description(
+            en="Optional override model for summary generation",
+            zh="用于生成 summary 的可选覆盖模型",
+        ),
+        "summarizer_timeout_sec": Description(
+            en="Timeout in seconds for summary generation",
+            zh="summary 生成超时时间（秒）",
         ),
     }
 

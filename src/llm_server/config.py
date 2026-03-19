@@ -20,6 +20,8 @@ RUNTIME_RELOAD_SUPPORTED_FIELDS = [
     "character_config.agent_config.agent_settings.basic_memory_agent.faster_first_response",
     "character_config.agent_config.agent_settings.basic_memory_agent.segment_method",
     "character_config.agent_config.agent_settings.basic_memory_agent.mcp_enabled_servers",
+    "character_config.agent_config.agent_settings.basic_memory_agent.recent_message_window",
+    "character_config.agent_config.agent_settings.basic_memory_agent.context_compaction.*",
     "character_config.agent_config.llm_configs.*",
     "prompts/utils/*.txt",
     "mcp_servers.json (when MCP is already enabled)",
@@ -236,6 +238,7 @@ def _build_unity_config_summary(
     agent_config = character_config.get("agent_config", {})
     agent_settings = agent_config.get("agent_settings", {})
     basic_memory = agent_settings.get("basic_memory_agent", {})
+    context_compaction = basic_memory.get("context_compaction", {}) or {}
     llm_provider = basic_memory.get("llm_provider")
     llm_configs = agent_config.get("llm_configs", {})
     llm_config = llm_configs.get(llm_provider, {}) if llm_provider else {}
@@ -260,8 +263,24 @@ def _build_unity_config_summary(
         "conversation": {
             "fasterFirstResponse": basic_memory.get("faster_first_response"),
             "segmentMethod": basic_memory.get("segment_method"),
+            "recentMessageWindow": basic_memory.get("recent_message_window"),
             "mcpEnabled": enable_mcp,
             "mcpEnabledServers": basic_memory.get("mcp_enabled_servers", []),
+            "contextCompaction": {
+                "enabled": context_compaction.get("enabled", False),
+                "mode": context_compaction.get("mode", "recent_window_only"),
+                "targetMessageCount": context_compaction.get("target_message_count"),
+                "triggerMessageCount": context_compaction.get("trigger_message_count"),
+                "maxMessageCount": context_compaction.get("max_message_count"),
+                "minMessagesToCompact": context_compaction.get(
+                    "min_messages_to_compact"
+                ),
+                "summarizer": context_compaction.get("summarizer"),
+                "summarizerModel": context_compaction.get("summarizer_model"),
+                "summarizerTimeoutSec": context_compaction.get(
+                    "summarizer_timeout_sec"
+                ),
+            },
         },
         "prompts": {
             "personaPromptLength": len(persona_prompt),

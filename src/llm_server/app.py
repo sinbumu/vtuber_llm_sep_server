@@ -30,6 +30,7 @@ from .chat_service import (
     history_exists,
     LLMError,
     LLMTimeoutError,
+    queue_summary_job,
 )
 
 app = FastAPI(title="Open-LLM-VTuber LLM-only Server")
@@ -134,6 +135,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
         name=meta["character_name"],
         avatar=meta["avatar"],
     )
+    queue_summary_job(conf_uid=conf_uid, history_uid=history_uid, config=config)
 
     return ChatResponse(history_uid=history_uid, text=assistant_text)
 
@@ -195,6 +197,7 @@ async def chat_ws(websocket: WebSocket) -> None:
                 name=meta["character_name"],
                 avatar=meta["avatar"],
             )
+            queue_summary_job(conf_uid=conf_uid, history_uid=history_uid, config=config)
             await websocket.send_json({"type": "done", "text": full_response})
         except LLMTimeoutError:
             await websocket.send_json(
