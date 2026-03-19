@@ -52,7 +52,27 @@ YourUnityProject/
 1. `conf.unity.example.yaml` 복사
 2. 이름을 `conf.yaml`로 변경
 3. Unity 배포 폴더의 `llm_server.exe` 옆에 배치
-4. API key / model / persona만 우선 수정
+4. API key / model / persona를 우선 수정
+5. 장기 대화 정책이 필요하면 `basic_memory_agent.context_compaction`도 함께 조정
+
+## 장기 대화 설정
+
+Unity 기준으로 긴 대화 품질에 가장 영향이 큰 항목은 아래입니다.
+
+- `recent_message_window`: recent-window 경로에서 유지할 최근 메시지 수
+- `context_compaction.mode`: `recent_window_only` 또는 `summary_recent_window`
+- `context_compaction.target_message_count`: summary 후 남길 raw message 수
+- `context_compaction.trigger_message_count`: background summary 시작 기준
+- `context_compaction.max_message_count`: live buffer 상한
+
+현재 QA 기본값:
+- `recent_message_window: 32`
+- `target=24`, `trigger=28`, `max=32`
+
+권장:
+- 초반 QA에서는 이 값을 그대로 시작
+- 발화가 짧고 문맥 누락이 느껴지면 `max`와 `recent_message_window`를 먼저 늘림
+- 요약이 너무 자주 돈다면 `trigger`를 올리거나 `target`을 함께 조정
 
 ## Unity에서 서버 실행 시 권장 환경변수
 
@@ -82,7 +102,8 @@ MVP 권장:
 - LLM provider / model / base_url / api_key
 - `persona_prompt`
 - `tool_prompts`
-- 일부 대화 관련 설정
+- `recent_message_window`
+- `context_compaction.*`
 
 권장 MVP:
 - 사용자가 설정 변경
@@ -108,6 +129,7 @@ GET /admin/current-config
 용도:
 - Unity UI와 실제 적용 설정 비교
 - 현재 provider/model/port 등 표시
+- 현재 `recentMessageWindow`, `contextCompaction` 값도 함께 확인 가능
 
 ### 3) 설정 재로드 검증
 ```http

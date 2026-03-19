@@ -88,6 +88,15 @@ pyinstaller llm_server.spec
 - MVP에서는 설정 변경 후 서버 재시작
 - 일부 설정은 `/admin/reload-config`로 다음 요청부터 반영 가능
 
+### 장기 대화 설정
+
+현재 기본 `conf.yaml`은 장기 대화를 위해 `summary + recent window`를 사용합니다.
+
+- 경로: `character_config.agent_config.agent_settings.basic_memory_agent.context_compaction`
+- 현재 QA 기준값: `target=24`, `trigger=28`, `max=32`
+- `recent_message_window: 32`로 최근 메시지는 넉넉하게 유지합니다.
+- 이 값들은 `/admin/reload-config` 검증 후 **다음 요청부터 반영 가능**합니다.
+
 ## Unity 연동
 
 - Unity 포함/프로세스 실행/설정 파일 관리 가이드: `UNITY_GUIDE.md`
