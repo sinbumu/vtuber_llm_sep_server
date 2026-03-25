@@ -110,41 +110,26 @@ MVP 권장:
 - Unity가 `conf.yaml` 저장
 - Unity가 서버 재시작
 
-## Unity가 호출하면 좋은 API
+## Unity가 호출할 API 방향
 
-### 1) 서버 생존 확인
-```http
-GET /health
-```
+권장 방향:
+- 일반 채팅은 `POST /v1/chat` 사용
+- 화면/카메라 snapshot 첨부도 `POST /v1/chat` 사용
+- `/v1/ws/chat`은 레거시 스트리밍 경로로 유지
 
-용도:
-- 서버가 정상 기동했는지 확인
-- 포트 충돌/기동 실패 감지
+이유:
+- 현재 새 기능은 `POST /v1/chat` 기준으로 먼저 확장됨
+- 이미지 입력은 현재 `POST /v1/chat`만 지원
+- Unity 앱은 request/response형 HTTP가 디버깅과 예외 처리 측면에서 더 단순함
 
-### 2) 현재 적용 설정 요약
-```http
-GET /admin/current-config
-```
-
-용도:
-- Unity UI와 실제 적용 설정 비교
-- 현재 provider/model/port 등 표시
-- 현재 `recentMessageWindow`, `contextCompaction` 값도 함께 확인 가능
-
-### 3) 설정 재로드 검증
-```http
-POST /admin/reload-config
-```
-
-용도:
-- `conf.yaml` 저장 후 검증
-- 어떤 항목이 재시작 필요한지 확인
+API 필드, 요청 예시, 응답 코드, 에러 처리 규칙은 별도 문서로 분리했습니다:
+- `UNITY_API_GUIDE.md`
 
 ## Unity 쪽 기본 플로우
 
 1. Unity가 `llm_server.exe` 실행
 2. `/health` 폴링으로 준비 완료 확인
-3. `/v1/chat` 또는 `/v1/ws/chat` 사용
+3. 기본 채팅은 `POST /v1/chat` 사용
 4. 사용자가 설정 변경
 5. Unity가 외부 `conf.yaml` 저장
 6. MVP에서는 서버 재시작
@@ -174,5 +159,6 @@ POST /admin/reload-config
 
 - `README.md`
 - `README_LLM_SERVER.md`
+- `UNITY_API_GUIDE.md`
 - `docs/UNITY_LLM_SERVER_SETTINGS.md`
 - `docs/SERVER_RELOAD_ANALYSIS.md`

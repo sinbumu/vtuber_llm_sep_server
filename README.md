@@ -100,6 +100,7 @@ pyinstaller llm_server.spec
 ## Unity 연동
 
 - Unity 포함/프로세스 실행/설정 파일 관리 가이드: `UNITY_GUIDE.md`
+- Unity용 API 기능 명세서: `UNITY_API_GUIDE.md`
 - 참고용 외부 설정 예시: `conf.unity.example.yaml`
 
 ## 참고

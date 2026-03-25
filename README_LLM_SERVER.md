@@ -81,6 +81,30 @@ curl -X POST http://127.0.0.1:8000/v1/chat ^
 {"history_uid":"...","text":"..."}
 ```
 
+이미지 첨부도 가능합니다:
+```json
+{
+  "conf_uid": "mao_pro_001",
+  "history_uid": null,
+  "text": "이 화면 보고 설명해줘",
+  "images": [
+    {
+      "source": "screen",
+      "mime_type": "image/jpeg",
+      "data": "data:image/jpeg;base64,..."
+    }
+  ]
+}
+```
+
+메모:
+- `images`는 optional입니다.
+- 현재 `/v1/chat`이 기본 권장 API이며 이미지 입력도 이 경로를 사용합니다.
+- `/v1/ws/chat`은 레거시 스트리밍 경로로 유지합니다.
+- `data`는 `data:image/...;base64,...` 형태의 data URL이어야 합니다.
+- history에는 원본 이미지가 아니라 attachment 메타만 저장됩니다.
+- vision 미지원 provider/model이면 요청이 실패할 수 있습니다.
+
 ---
 
 ## 5) Persona 적용 테스트 (Plan3 이후)
@@ -221,3 +245,4 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8000/admin/reload-config" -Method Post
 - LLM-only 서버는 **ASR/TTS/Live2D/VAD/OBS를 초기화하지 않습니다.**
 - `mem0_agent`는 미구현 상태이므로 **기본 비활성화**됩니다.
 - /v1/ws/chat 스트리밍은 LLM 응답 조각을 delta로 전송합니다.
+- Unity 이식 가이드는 `UNITY_GUIDE.md`, Unity API 명세는 `UNITY_API_GUIDE.md`를 참고하세요.

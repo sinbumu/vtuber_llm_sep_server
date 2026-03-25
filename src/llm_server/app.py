@@ -25,6 +25,8 @@ from .config import (
     get_character_meta,
 )
 from .chat_service import (
+    ChatInputError,
+    build_attachment_metadata,
     run_chat_once,
     run_chat_stream,
     history_exists,
@@ -92,6 +94,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
     conf_uid = request.conf_uid.strip()
     history_uid = request.history_uid.strip() if request.history_uid else None
     text = request.text
+    images = [image.model_dump() for image in (request.images or [])]
 
     if history_uid and not history_exists(conf_uid, history_uid):
         raise HTTPException(status_code=404, detail="history_not_found")
@@ -108,8 +111,12 @@ async def chat(request: ChatRequest) -> ChatResponse:
             conf_uid=conf_uid,
             history_uid=history_uid,
             text=text,
+            images=images,
             config=config,
         )
+    except ChatInputError as exc:
+        logger.warning(f"Invalid chat input: {exc}")
+        raise HTTPException(status_code=400, detail=str(exc))
     except LLMTimeoutError as exc:
         logger.error(f"LLM timeout: {exc}")
         raise HTTPException(status_code=502, detail="llm_timeout")
@@ -126,6 +133,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
         role="human",
         content=text,
         name=meta["human_name"],
+        attachments=build_attachment_metadata(images),
     )
     store_message(
         conf_uid=conf_uid,
@@ -174,6 +182,7 @@ async def chat_ws(websocket: WebSocket) -> None:
                 conf_uid=conf_uid,
                 history_uid=history_uid,
                 text=text,
+                images=None,
                 config=config,
             )
             full_response = ""
@@ -188,6 +197,7 @@ async def chat_ws(websocket: WebSocket) -> None:
                 role="human",
                 content=text,
                 name=meta["human_name"],
+                attachments=None,
             )
             store_message(
                 conf_uid=conf_uid,
@@ -202,6 +212,10 @@ async def chat_ws(websocket: WebSocket) -> None:
         except LLMTimeoutError:
             await websocket.send_json(
                 {"type": "error", "code": "llm_timeout", "message": "LLM timeout"}
+            )
+        except ChatInputError as exc:
+            await websocket.send_json(
+                {"type": "error", "code": "invalid_input", "message": str(exc)}
             )
         except LLMError:
             await websocket.send_json(

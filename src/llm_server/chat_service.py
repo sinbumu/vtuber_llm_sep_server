@@ -11,8 +11,14 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 from loguru import logger
 
 from open_llm_vtuber.agent.agents.basic_memory_agent import BasicMemoryAgent
+from open_llm_vtuber.agent.input_types import (
+    BatchInput,
+    ImageData,
+    ImageSource,
+    TextData,
+    TextSource,
+)
 from open_llm_vtuber.agent.stateless_llm_factory import LLMFactory
-from open_llm_vtuber.agent.input_types import BatchInput, TextData, TextSource
 from open_llm_vtuber.chat_history_manager import (
     _get_safe_history_path,
     get_history,
@@ -26,6 +32,20 @@ from open_llm_vtuber.agent.output_types import SentenceOutput
 
 
 DEFAULT_LLM_TIMEOUT_SECONDS = 60
+MAX_CHAT_IMAGES = 2
+ALLOWED_IMAGE_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+VISION_CAPABLE_PROVIDERS = {
+    "openai_compatible_llm",
+    "openai_llm",
+    "gemini_llm",
+    "zhipu_llm",
+    "deepseek_llm",
+    "groq_llm",
+    "mistral_llm",
+    "lmstudio_llm",
+    "claude_llm",
+    "ollama_llm",
+}
 SUMMARY_PROMPT = """You are a conversation memory compressor.
 
 Merge the existing summary and the new conversation chunk into a compact running summary.
@@ -49,6 +69,10 @@ class LLMError(RuntimeError):
 
 class LLMTimeoutError(TimeoutError):
     """Raised when LLM invocation times out."""
+
+
+class ChatInputError(ValueError):
+    """Raised when chat input is invalid or unsupported."""
 
 
 @dataclass(slots=True)
@@ -172,10 +196,86 @@ def _build_agent(
     return agent
 
 
-def _build_batch_input(text: str) -> BatchInput:
+def _get_llm_provider(config: Dict[str, Any]) -> str:
+    """Return the configured llm provider for the basic memory agent."""
+    character_config = config.get("character_config", {}) if config else {}
+    agent_config = character_config.get("agent_config", {}) if character_config else {}
+    agent_settings = agent_config.get("agent_settings", {}) if agent_config else {}
+    basic_memory = agent_settings.get("basic_memory_agent", {}) if agent_settings else {}
+    return str(basic_memory.get("llm_provider") or "")
+
+
+def _validate_chat_images(images: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """Validate image payloads for /v1/chat."""
+    if not images:
+        return []
+
+    if len(images) > MAX_CHAT_IMAGES:
+        raise ChatInputError(f"At most {MAX_CHAT_IMAGES} images are allowed per request")
+
+    validated_images: list[dict[str, Any]] = []
+    for image in images:
+        source = str(image.get("source") or "")
+        mime_type = str(image.get("mime_type") or "")
+        data = str(image.get("data") or "")
+
+        if source not in {"screen", "camera", "clipboard", "upload"}:
+            raise ChatInputError(f"Unsupported image source: {source}")
+        if mime_type not in ALLOWED_IMAGE_MIME_TYPES:
+            raise ChatInputError(f"Unsupported image mime_type: {mime_type}")
+        if not data.startswith(f"data:{mime_type};base64,"):
+            raise ChatInputError("Image data must be a matching data URL")
+
+        validated_images.append(
+            {
+                "source": source,
+                "mime_type": mime_type,
+                "data": data,
+            }
+        )
+
+    return validated_images
+
+
+def _ensure_provider_supports_images(config: Dict[str, Any], images: list[dict[str, Any]]) -> None:
+    """Reject image requests for providers without known image support."""
+    if not images:
+        return
+
+    llm_provider = _get_llm_provider(config)
+    if llm_provider not in VISION_CAPABLE_PROVIDERS:
+        raise ChatInputError(
+            f"Configured provider '{llm_provider}' does not support image input in llm_server"
+        )
+
+
+def build_attachment_metadata(images: list[dict[str, Any]] | None) -> list[dict[str, Any]] | None:
+    """Build metadata-only attachment descriptors for history storage."""
+    if not images:
+        return None
+
+    return [
+        {
+            "type": "image",
+            "source": image["source"],
+            "mime_type": image["mime_type"],
+        }
+        for image in images
+    ]
+
+
+def _build_batch_input(text: str, images: list[dict[str, Any]] | None = None) -> BatchInput:
     return BatchInput(
         texts=[TextData(source=TextSource.INPUT, content=text, from_name="Human")],
-        images=None,
+        images=[
+            ImageData(
+                source=ImageSource(image["source"]),
+                data=image["data"],
+                mime_type=image["mime_type"],
+            )
+            for image in (images or [])
+        ]
+        or None,
         metadata=None,
     )
 
@@ -188,6 +288,11 @@ def _extract_text_chunk(output: Any) -> Optional[str]:
     if isinstance(output, dict) and output.get("type") == "text_delta":
         return output.get("text", "")
     return None
+
+
+def _is_upstream_error_text(text: str) -> bool:
+    """Return True when the adapter emitted an upstream error as plain text."""
+    return text.startswith("Error calling the chat endpoint:")
 
 
 def _get_mcp_settings(config: Dict[str, Any]) -> tuple[bool, List[str]]:
@@ -566,6 +671,8 @@ async def _collect_llm_response(
     output_text = ""
     async for event in llm.chat_completion(messages, system_prompt, tools=None):
         if isinstance(event, str):
+            if _is_upstream_error_text(event):
+                raise LLMError(event)
             output_text += event
         elif isinstance(event, list):
             logger.warning("Tool calls received but tools are disabled")
@@ -586,6 +693,7 @@ async def run_chat_stream(
     conf_uid: str,
     history_uid: str,
     text: str,
+    images: list[dict[str, Any]] | None,
     config: Dict[str, Any],
 ) -> tuple[str, AsyncIterator[str], BasicMemoryAgent]:
     """Run streaming chat and return history_uid + async iterator."""
@@ -604,6 +712,8 @@ async def run_chat_stream(
             enable_mcp = False
 
     system_prompt = _build_system_prompt(persona_prompt, tool_prompts, enable_mcp)
+    validated_images = _validate_chat_images(images)
+    _ensure_provider_supports_images(config, validated_images)
     agent = _build_agent(
         conf_uid=conf_uid,
         history_uid=history_uid,
@@ -620,7 +730,7 @@ async def run_chat_stream(
         system_prompt=system_prompt,
         config=config,
     )
-    batch_input = _build_batch_input(text)
+    batch_input = _build_batch_input(text, validated_images)
     messages = agent._to_messages(batch_input)
 
     async def stream_iter() -> AsyncIterator[str]:
@@ -635,6 +745,8 @@ async def run_chat_stream(
                     messages, effective_system_prompt, tools=None
                 ):
                     if isinstance(event, str):
+                        if _is_upstream_error_text(event):
+                            raise LLMError(event)
                         yield event
                     elif isinstance(event, list):
                         logger.warning("Tool calls received but tools are disabled")
@@ -653,6 +765,7 @@ async def run_chat_once(
     conf_uid: str,
     history_uid: str,
     text: str,
+    images: list[dict[str, Any]] | None,
     config: Dict[str, Any],
 ) -> str:
     """Run one-shot chat with LLM and return response text."""
@@ -671,6 +784,8 @@ async def run_chat_once(
             enable_mcp = False
 
     system_prompt = _build_system_prompt(persona_prompt, tool_prompts, enable_mcp)
+    validated_images = _validate_chat_images(images)
+    _ensure_provider_supports_images(config, validated_images)
     agent = _build_agent(
         conf_uid=conf_uid,
         history_uid=history_uid,
@@ -687,7 +802,7 @@ async def run_chat_once(
         system_prompt=system_prompt,
         config=config,
     )
-    batch_input = _build_batch_input(text)
+    batch_input = _build_batch_input(text, validated_images)
     messages = agent._to_messages(batch_input)
 
     try:
